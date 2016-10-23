@@ -1,10 +1,10 @@
 /* Tar Heels Allocator
- *
+ * 
  * Simple Hoard-style malloc/free implementation.
- * Not suitable for use for large allocatoins, or
+ * Not suitable for use for large allocatoins, or 
  * in multi-threaded programs.
- *
- * to use:
+ * 
+ * to use: 
  * $ export LD_PRELOAD=/path/to/th_alloc.so <your command>
  */
 
@@ -13,7 +13,7 @@
 #define SUPER_BLOCK_SIZE 4096
 #define SUPER_BLOCK_MASK (~(SUPER_BLOCK_SIZE-1))
 #define MIN_ALLOC 32 /* Smallest real allocation.  Round smaller mallocs up */
-#define MAX_ALLOC 2048 /* Fail if anything bigger is attempted.
+#define MAX_ALLOC 2048 /* Fail if anything bigger is attempted.  
 		        * Challenge: handle big allocations */
 #define RESERVE_SUPERBLOCK_THRESHOLD 2
 
@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-
+ 
 #define assert(cond) if (!(cond)) __asm__ __volatile__ ("int $3")
 
 /* Object: One return from malloc/input to free. */
@@ -45,7 +45,7 @@ struct __attribute__((packed)) superblock_bookkeeping {
   uint8_t free_count; // Max objects per superblock is 128-1, so a byte is sufficient
   uint8_t level;
 };
-
+  
 /* Superblock: a chunk of contiguous virtual memory.
  * Subdivide into allocations of same power-of-two size. */
 struct __attribute__((packed)) superblock {
@@ -54,7 +54,7 @@ struct __attribute__((packed)) superblock {
 };
 
 
-/* The structure for one pool of superblocks.
+/* The structure for one pool of superblocks.  
  * One of these per power-of-two */
 struct superblock_pool {
   struct superblock_bookkeeping *next;
@@ -74,29 +74,10 @@ static struct superblock_pool levels[LEVELS] = {{NULL, 0, 0},
 
 static inline int size2level (ssize_t size) {
   /* Your code here.
-   * Convert the size to the correct power of two.
-   * Recall that the 0th entry in levels is really 2^5,
+   * Convert the size to the correct power of two. 
+   * Recall that the 0th entry in levels is really 2^5, 
    * the second level represents 2^6, etc.
    */
-   if(size<=0){
-     return NULL;
-   }
-   if(size>MAX_ALLOC){
-     return NULL;
-   }
-   if(size<MIN_ALLOC && size>0){
-     size = 32;
-   }
-   int i = 5;
-   while (true) {
-     if (size <= 2^i) {
-       return i-5;
-     }
-     else{
-       i++;
-     }
-   }
-
   return 0;
 }
 
@@ -107,11 +88,10 @@ struct superblock_bookkeeping * alloc_super (int power) {
   struct superblock* sb;
   int free_objects = 0, bytes_per_object = 0;
   char *cursor;
-  // Your code here
+  // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
-  page = mmap(NULL,SUPER_BLOCK_SIZE,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE,-1,0);
-
+  
   sb = (struct superblock*) page;
   // Put this one the list.
   sb->bkeep.next = levels[power].next;
@@ -119,7 +99,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   levels[power].whole_superblocks++;
   sb->bkeep.level = power;
   sb->bkeep.free_list = NULL;
-
+  
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
@@ -127,7 +107,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
-
+  
   cursor = (char *) sb;
   // skip the first object
   for (cursor += bytes_per_object; free_objects--; cursor += bytes_per_object) {
@@ -144,18 +124,18 @@ void *malloc(size_t size) {
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
   int power = size2level(size);
-
+  
   // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
     errno = -ENOMEM;
     return NULL;
   }
-
+  
   // Delete the following two lines
   errno = -ENOMEM;
   return rv;
 
-
+  
   pool = &levels[power];
 
   if (!pool->free_objects) {
@@ -206,7 +186,7 @@ void free(void *ptr) {
 
     break; // hack to keep this loop from hanging; remove in ex 4
   }
-
+  
   /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
    * Hint: use FREE_POISON
    */
