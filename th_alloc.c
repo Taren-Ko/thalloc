@@ -1,12 +1,12 @@
-// /* Tar Heels Allocator
- *
- * Simple Hoard-style malloc/free implementation.
- * Not suitable for use for large allocatoins, or
- * in multi-threaded programs.
- *
- * to use:
- * $ export LD_PRELOAD=/path/to/th_alloc.so <your command>
- */
+/* Tar Heels Allocator
+*
+* Simple Hoard-style malloc/free implementation.
+* Not suitable for use for large allocatoins, or
+* in multi-threaded programs.
+*
+* to use:
+* $ export LD_PRELOAD=/path/to/th_alloc.so <your command>
+*/
 
 /* Hard-code some system parameters */
 
@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 #define assert(cond) if (!(cond)) __asm__ __volatile__ ("int $3")
 
@@ -79,25 +80,27 @@ static inline int size2level (ssize_t size) {
    * the second level represents 2^6, etc.
    */
    if(size<=0){
-     return NULL;
+     return 0;
    }
    if(size>MAX_ALLOC){
-     return NULL;
+     return 0;
    }
    if(size<MIN_ALLOC && size>0){
      size = 32;
    }
-   int i = 5;
-   while (true) {
-     if (size <= 2^i) {
-       return i-5;
-     }
-     else{
-       i++;
-     }
+   int i;
+   i = 0;
+   double test;
+   test = (double)size;
+   while(test>1) {
+     test = test/2;
+     i++;
    }
+   i = i-5;
 
-  return 0;
+   printf("%d\n", i);
+   return i;
+
 }
 
 static inline
@@ -123,8 +126,15 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-  free_objects = SUPER_BLOCK_SIZE/(2^(power+5));
-  levels[power]->free_objects = free_objects;
+  free_objects = SUPER_BLOCK_SIZE/(2^(power+5))-1;
+  if (!levels[power].free_objects){
+    levels[power].free_objects = free_objects-1;
+  }
+  else{
+    levels[power].free_objects = levels[power].free_objects + free_objects-1;
+  }
+  bytes_per_object = 2^(power+5);
+  sb->bkeep.free_count=free_objects-1;
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
@@ -145,6 +155,7 @@ void *malloc(size_t size) {
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
   int power = size2level(size);
+  // printf("%d\n", power);
 
   // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
@@ -170,6 +181,13 @@ void *malloc(size_t size) {
       /* Remove an object from the free list. */
       // Your code here
       //
+      rv = next;
+      // if (bkeep->free_list==NULL){
+      //   printf("testing\n");
+      // }
+      bkeep->free_list=next->next;
+
+
 
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
@@ -212,6 +230,7 @@ void free(void *ptr) {
   /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
    * Hint: use FREE_POISON
    */
+
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
