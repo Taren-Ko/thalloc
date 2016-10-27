@@ -134,13 +134,13 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // printf("%d\n", divisor);
   free_objects = SUPER_BLOCK_SIZE/(divisor)-1;
   if (!levels[power].free_objects){
-    levels[power].free_objects = free_objects-1;
+    levels[power].free_objects = free_objects;
   }
   else{
-    levels[power].free_objects = levels[power].free_objects + free_objects-1;
+    levels[power].free_objects = levels[power].free_objects + free_objects;
   }
-  bytes_per_object = 2^(power+5);
-  sb->bkeep.free_count=free_objects-1;
+  bytes_per_object = divisor;
+  sb->bkeep.free_count=free_objects;
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
