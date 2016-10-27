@@ -115,10 +115,13 @@ struct superblock_bookkeeping * alloc_super (int power) {
   sb->bkeep.level = power;
   sb->bkeep.free_list = NULL;
   
-  // Your code here: Calculate and fill the number of free objects in this superblock
+  // Your code here: Calculate (code) and fill (later loop as seen) the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-  levels[power].free_objects = math((2^power)*4);
+
+  //levels[power].free_objects = math((2^power)*4);
+
+ // free_objects = bkeep.free_count;
 
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
@@ -162,8 +165,11 @@ void *malloc(size_t size) {
       struct object *next = bkeep->free_list;
       /* Remove an object from the free list. */
       // Your code here
-      bkeep.free_list->next = NULL;
-      levels[power].free_count--;
+      rv = next;
+      bkeep->free_list = bkeep->free_list.next;
+      bkeep->free_list.next = NULL;
+      bkeep->free_count--;
+      levels[power]->whole_superblocks--;
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
       break;
@@ -174,7 +180,8 @@ void *malloc(size_t size) {
   assert(rv != NULL);
 
   /* Exercise 3: Poison a newly allocated object to detect init errors.
-   * Hint: use ALLOC_POISON
+   * Hint: use ALLOC_POISON   a line of malloc for malloc and a free for free
+   malloc(size);
    */
   return rv;
 }
@@ -207,6 +214,7 @@ void free(void *ptr) {
   
   /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
    * Hint: use FREE_POISON
+   free(ptr);
    */
 }
 
