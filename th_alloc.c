@@ -126,7 +126,13 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-  free_objects = SUPER_BLOCK_SIZE/(2^(power+5))-1;
+  int i;
+  int divisor = 2;
+  for (i = 0; i < (power+4); i++) {
+    divisor = divisor * 2;
+  }
+  // printf("%d\n", divisor);
+  free_objects = SUPER_BLOCK_SIZE/(divisor)-1;
   if (!levels[power].free_objects){
     levels[power].free_objects = free_objects-1;
   }
