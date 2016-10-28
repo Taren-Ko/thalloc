@@ -1,8 +1,9 @@
-/* Tar Heels Allocator
+/* COMP530 Lab2 Tar Heels Allocator
+ * HONORS PLEDGE: We certify that no unauthorized assistance has been received or given in the completion of this work.
+ ~signed: Andy Ngo, Cameron 
  * 
  * Simple Hoard-style malloc/free implementation.
- * Not suitable for use for large allocatoins, or 
- * in multi-threaded programs.
+ * Not suitable for use for large allocatoins, or in multi-threaded programs.
  * 
  * to use: 
  * $ export LD_PRELOAD=/path/to/th_alloc.so <your command>
@@ -74,10 +75,23 @@ static struct superblock_pool levels[LEVELS] = {{NULL, 0, 0},
 
 static inline int size2level (ssize_t size) {
   /* Your code here.
-   * Convert the size to the correct power of two. 
-   * Recall that the 0th entry in levels is really 2^5, 
+   * Convert the size to the correct power of two = n. 
+   * Recall that the 0th entry in levels is really 2^5" n=5, 
    * the second level represents 2^6, etc.
    */
+  int i = 5;
+  if(size <= 0 || size > MAX_ALLOC){
+    return NULL;
+  }
+  if(size < MIN_ALLOC && size>0){
+    size = 32;
+  }
+  while (i <= 11) {
+    if (size <= 2^i) {
+      return i-5;
+    }
+    i++;
+  }
   return 0;
 }
 
@@ -88,9 +102,12 @@ struct superblock_bookkeeping * alloc_super (int power) {
   struct superblock* sb;
   int free_objects = 0, bytes_per_object = 0;
   char *cursor;
+  int div;
+  int i = 0;
   // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
+  page = mmap(NULL,SUPER_BLOCK_SIZE,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE,-1,0);
   
   sb = (struct superblock*) page;
   // Put this one the list.
@@ -100,9 +117,24 @@ struct superblock_bookkeeping * alloc_super (int power) {
   sb->bkeep.level = power;
   sb->bkeep.free_list = NULL;
   
-  // Your code here: Calculate and fill the number of free objects in this superblock
+  // Your code here: Calculate (code) and fill (later loop as seen) the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
+  div = 2;
+  for (; i < (power+4); i++) {
+    div *= 2;
+  }
+  // printf("%d\n", divisor);  //test if part of the math div outputs correctly
+  free_objects = SUPER_BLOCK_SIZE/(div)-1;
+
+  if (!levels[power].free_objects){
+    levels[power].free_objects = free_objects;
+  } else {
+    levels[power].free_objects += free_objects;
+  }
+
+  bytes_per_object = div;
+  sb->bkeep.free_count=free_objects;
 
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
@@ -132,9 +164,7 @@ void *malloc(size_t size) {
   }
   
   // Delete the following two lines
-  errno = -ENOMEM;
-  return rv;
-
+  //errno = -ENOMEM;    //return rv;
   
   pool = &levels[power];
 
@@ -148,7 +178,9 @@ void *malloc(size_t size) {
       struct object *next = bkeep->free_list;
       /* Remove an object from the free list. */
       // Your code here
-      //
+      rv = next;
+      bkeep->free_list = next->next;
+      //levels[power]->whole_superblocks--;
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
       break;
@@ -159,7 +191,8 @@ void *malloc(size_t size) {
   assert(rv != NULL);
 
   /* Exercise 3: Poison a newly allocated object to detect init errors.
-   * Hint: use ALLOC_POISON
+   * Hint: use ALLOC_POISON   a line of malloc for malloc and a free for free
+   malloc(size);
    */
   return rv;
 }
@@ -175,6 +208,9 @@ void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
 
   // Your code here.
+  //bkeep->
+  //levels[bkeep->level].free_list;
+  levels[bkeep->level].free_count--;
   //   Be sure to put this back on the free list, and update the
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
@@ -189,6 +225,7 @@ void free(void *ptr) {
   
   /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
    * Hint: use FREE_POISON
+   free(ptr);
    */
 }
 
