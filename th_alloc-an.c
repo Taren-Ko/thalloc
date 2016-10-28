@@ -102,6 +102,8 @@ struct superblock_bookkeeping * alloc_super (int power) {
   struct superblock* sb;
   int free_objects = 0, bytes_per_object = 0;
   char *cursor;
+  int div;
+  int i = 0;
   // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
@@ -118,10 +120,21 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate (code) and fill (later loop as seen) the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
+  div = 2;
+  for (; i < (power+4); i++) {
+    div *= 2;
+  }
+  // printf("%d\n", divisor);  //test if part of the math div outputs correctly
+  free_objects = SUPER_BLOCK_SIZE/(div)-1;
 
-  //levels[power].free_objects = math((2^power)*4);
+  if (!levels[power].free_objects){
+    levels[power].free_objects = free_objects;
+  } else {
+    levels[power].free_objects += free_objects;
+  }
 
- // free_objects = bkeep.free_count;
+  bytes_per_object = div;
+  sb->bkeep.free_count=free_objects;
 
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
@@ -166,10 +179,8 @@ void *malloc(size_t size) {
       /* Remove an object from the free list. */
       // Your code here
       rv = next;
-      bkeep->free_list = bkeep->free_list.next;
-      bkeep->free_list.next = NULL;
-      bkeep->free_count--;
-      levels[power]->whole_superblocks--;
+      bkeep->free_list = next->next;
+      //levels[power]->whole_superblocks--;
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
       break;
