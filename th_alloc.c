@@ -176,10 +176,13 @@ void *malloc(size_t size) {
 
   pool = &levels[power];
 
+  int whole;
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
+    whole = 1;
   } else
     bkeep = pool->next;
+    whole = 0;
 
   while (bkeep != NULL) {
     if (bkeep->free_count) {
@@ -193,7 +196,13 @@ void *malloc(size_t size) {
       // }
       bkeep->free_list=next->next;
 
+      bkeep->free_count--;
+      pool->free_objects--;
 
+
+      if (whole == 1) {
+        levels[power].whole_superblocks--;
+      }
 
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
@@ -207,6 +216,8 @@ void *malloc(size_t size) {
   /* Exercise 3: Poison a newly allocated object to detect init errors.
    * Hint: use ALLOC_POISON
    */
+  //  memset(rv, (int)ALLOC_POISON, (int)size);
+
   return rv;
 }
 
@@ -225,10 +236,30 @@ void free(void *ptr) {
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
 
+  bkeep->next = bkeep->free_list;
+  bkeep->free_list = ptr;
+
+
+  bkeep->free_count++;
+  levels[bkeep->level].free_objects++;
+
+  int i;
+  int divisor = 2;
+  for (i = 0; i < (bkeep->level+4); i++) {
+    divisor = divisor * 2;
+  }
+  int test = (SUPER_BLOCK_SIZE/divisor)-1;
+  if (bkeep->free_count==test) {
+    levels[bkeep->level].whole_superblocks++;
+  }
+
+
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
+
+
 
     break; // hack to keep this loop from hanging; remove in ex 4
   }
@@ -237,6 +268,7 @@ void free(void *ptr) {
    * Hint: use FREE_POISON
    */
 
+  //  memset(ptr, FREE_POISON, );
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
