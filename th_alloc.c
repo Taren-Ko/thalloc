@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 #include <sys/mman.h>
 
 #define assert(cond) if (!(cond)) __asm__ __volatile__ ("int $3")
@@ -216,7 +217,7 @@ void *malloc(size_t size) {
   /* Exercise 3: Poison a newly allocated object to detect init errors.
    * Hint: use ALLOC_POISON
    */
-  //  memset(rv, (int)ALLOC_POISON, (int)size);
+   memset(rv, ALLOC_POISON, (size_t)((1<<(power+5))));
 
   return rv;
 }
@@ -236,8 +237,10 @@ void free(void *ptr) {
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
 
-  bkeep->next = bkeep->free_list;
-  bkeep->free_list = ptr;
+
+  struct object *frpnt = (struct object*) ptr;
+  frpnt->next = bkeep->free_list;
+  bkeep->free_list = frpnt;
 
 
   bkeep->free_count++;
@@ -253,6 +256,12 @@ void free(void *ptr) {
     levels[bkeep->level].whole_superblocks++;
   }
 
+  /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
+   * Hint: use FREE_POISON
+   */
+   int lev = bkeep->level;
+   memset(ptr, FREE_POISON, (size_t)((1<<(lev+5))));
+
 
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
@@ -264,11 +273,7 @@ void free(void *ptr) {
     break; // hack to keep this loop from hanging; remove in ex 4
   }
 
-  /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
-   * Hint: use FREE_POISON
-   */
 
-  //  memset(ptr, FREE_POISON, );
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
