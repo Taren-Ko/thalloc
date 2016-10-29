@@ -1,6 +1,6 @@
 /* COMP530 Lab2 Tar Heels Allocator
  * HONORS PLEDGE: We certify that no unauthorized assistance has been received or given in the completion of this work.
- ~signed: Andy Ngo, Cameron 
+ ~signed: Andy Ngo, Cameron McCullers
  * 
  * Simple Hoard-style malloc/free implementation.
  * Not suitable for use for large allocatoins, or in multi-threaded programs.
@@ -79,20 +79,27 @@ static inline int size2level (ssize_t size) {
    * Recall that the 0th entry in levels is really 2^5" n=5, 
    * the second level represents 2^6, etc.
    */
-  int i = 5;
-  if(size <= 0 || size > MAX_ALLOC){
-    return NULL;
-  }
-  if(size < MIN_ALLOC && size>0){
-    size = 32;
-  }
-  while (i <= 11) {
-    if (size <= 2^i) {
-      return i-5;
-    }
-    i++;
-  }
-  return 0;
+   int i = 0;
+   double test;
+
+   if(size<=0){
+     return 0;
+   }
+   if(size>MAX_ALLOC){
+     return 0;
+   }
+   if(size<MIN_ALLOC && size>0){
+     size = 32;
+   }
+
+   test = (double)size;
+   while(test>1) {
+     test = test/2;
+     i++;
+   }
+   i = i-5;
+   printf("%d\n", i);
+   return i;
 }
 
 static inline
@@ -122,7 +129,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   //  the first one for the bookkeeping.
   div = 2;
   for (; i < (power+4); i++) {
-    div *= 2;
+    div = div*2;
   }
   // printf("%d\n", divisor);  //test if part of the math div outputs correctly
   free_objects = SUPER_BLOCK_SIZE/(div)-1;
@@ -132,14 +139,11 @@ struct superblock_bookkeeping * alloc_super (int power) {
   } else {
     levels[power].free_objects += free_objects;
   }
-
   bytes_per_object = div;
   sb->bkeep.free_count=free_objects;
-
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
-  
   cursor = (char *) sb;
   // skip the first object
   for (cursor += bytes_per_object; free_objects--; cursor += bytes_per_object) {
@@ -156,6 +160,7 @@ void *malloc(size_t size) {
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
   int power = size2level(size);
+  int whole;
   
   // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
@@ -170,8 +175,10 @@ void *malloc(size_t size) {
 
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
+    whole = 1;
   } else
     bkeep = pool->next;
+    whole = 0;
 
   while (bkeep != NULL) {
     if (bkeep->free_count) {
@@ -179,8 +186,12 @@ void *malloc(size_t size) {
       /* Remove an object from the free list. */
       // Your code here
       rv = next;
-      bkeep->free_list = next->next;
-      //levels[power]->whole_superblocks--;
+      bkeep->free_list=next->next;
+      bkeep->free_count--;
+      pool->free_objects--;
+      if (whole == 1) {
+        levels[power].whole_superblocks--;
+      }
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
       break;
@@ -192,8 +203,12 @@ void *malloc(size_t size) {
 
   /* Exercise 3: Poison a newly allocated object to detect init errors.
    * Hint: use ALLOC_POISON   a line of malloc for malloc and a free for free
-   malloc(size);
    */
+  /*copy into memory the ALLOC POISON wuth memset
+   when malloc, do poison once got rv 
+   when free, do poison before set pointer value, because if after, will overwrite what is stored in object
+   */
+  memset(rv, ALLOC_POISON, (size_t)((1<<(power+5))));
   return rv;
 }
 
@@ -206,27 +221,54 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
-
   // Your code here.
-  //bkeep->
-  //levels[bkeep->level].free_list;
-  levels[bkeep->level].free_count--;
   //   Be sure to put this back on the free list, and update the
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
+  int i;
+  int div = 2;
+  int u = 0;
+  struct superblock_bookkeeping *wBlock;
+  struct object *frpnt = (struct object*) ptr;
+
+  frpnt->next = bkeep->free_list;
+  bkeep->free_list = frpnt;
+
+
+  bkeep->free_count++;
+  levels[bkeep->level].free_objects++;
+
+  for (i = 0; i < (bkeep->level+4); i++) {
+    div = div * 2;
+  }
+  int test = (SUPER_BLOCK_SIZE/div)-1;
+  if (bkeep->free_count==test) {
+    levels[bkeep->level].whole_superblocks++;
+  }
+
+  /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
+   * Hint: use FREE_POISON
+   */
+   int lev = bkeep->level;
+   memset(ptr, FREE_POISON, (size_t)((1<<(lev+5))));
 
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
+    //// basically freeing an object 1) so freeing the wholes one can have: superbloacks LL
+    ///example: going down blocks, so delete empty superblocks each bkeep->next
+    /// if delete a middle, reset pointer 
+      wBlock = bkeep;
+      bkeep = wBlock->next;
+      u = munmap(wBlock, SUPER_BLOCK_SIZE);
+      if(u == 0){
+        levels[bkeep->level].whole_superblocks--;
+      }
 
-    break; // hack to keep this loop from hanging; remove in ex 4
+    //break; // hack to keep this loop from hanging; remove in ex 4
   }
   
-  /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
-   * Hint: use FREE_POISON
-   free(ptr);
-   */
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
