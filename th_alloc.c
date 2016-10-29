@@ -99,7 +99,7 @@ static inline int size2level (ssize_t size) {
    }
    i = i-5;
 
-   printf("%d\n", i);
+   //printf("%d\n", i);
    return i;
 
 }
@@ -217,7 +217,7 @@ void *malloc(size_t size) {
   /* Exercise 3: Poison a newly allocated object to detect init errors.
    * Hint: use ALLOC_POISON
    */
-   memset(rv, ALLOC_POISON, (size_t)((1<<(power+5))));
+   memset(rv, ALLOC_POISON, sizeof(*rv));
 
   return rv;
 }
@@ -260,17 +260,43 @@ void free(void *ptr) {
    * Hint: use FREE_POISON
    */
    int lev = bkeep->level;
-   memset(ptr, FREE_POISON, (size_t)((1<<(lev+5))));
+   memset(ptr+sizeof(void*), FREE_POISON, (size_t)((1<<(lev+5)))-sizeof(void*));
 
 
-  while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
+  if(levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
+  	struct superblock_bookkeeping* now;
+  	struct superblock_bookkeeping* before;
+  	now = levels[lev].next;
+
+  	//tests if the starting now is a whole superblock
+  	if(now->free_count == test){
+  		levels[lev].next = now->next;
+  		levels[lev].free_objects = levels[lev].free_objects - now->free_count;
+  		levels[lev].whole_superblocks--;
+  		munmap(now, SUPER_BLOCK_SIZE);
+  	}
+  	//if it isn't it loops until it finds a whole superblock and unmaps it
+  	else{
+  		while(now->next){
+  			before = now;
+  			now = now->next;
+  			if(now->free_count == test){
+  				before->next = now->next;
+  				levels[lev].free_objects = levels[lev].free_objects - now->free_count;
+  				levels[lev].whole_superblocks--;
+  				munmap(now, SUPER_BLOCK_SIZE);
+  				break;
+  			}
+  		}
+  	}
+
+    // munmap( ,SUPER_BLOCK_SIZE);
 
 
-
-    break; // hack to keep this loop from hanging; remove in ex 4
+    
   }
 
 
