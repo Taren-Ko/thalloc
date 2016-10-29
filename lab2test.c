@@ -3,11 +3,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-void testSet1();
-/*void testSet2();
-void testSet3();
-void testSet4();
-*/
+void print();
 
 int main() {
   void *u = malloc(8);
@@ -15,14 +11,30 @@ int main() {
   void *x = malloc(5);
   void *y = malloc(33);
   void *z = malloc(33);
-  // ex1: malloc() test
+  // ex1: malloc(int) test
+  print(u,v,x,y,z); 
+
+  //ex2: free(*) test
+  free(u);
+  free(v);
+  free(x);
+  free(y);
+  free(z);
+  print(u,v,x,y,z);
+
+  //ex3: memory poison
+
+  //ex4: 
+
+  return (errno);
+}
+
+void print(void *u, void *v, void *x, void *y, void *z){
   printf("Hello %p\n", u);
   printf("Hello %p\n", v);
   printf("Hello %p\n", x);
   printf("Hello %p\n", y);
   printf("Hello %p\n", z);
-  // void *a = malloc(32);
+     // void *a = malloc(32);
   // printf("Hello %p\n", a);
-
-  return (errno);
 }

@@ -110,12 +110,12 @@ struct superblock_bookkeeping * alloc_super (int power) {
   int free_objects = 0, bytes_per_object = 0;
   char *cursor;
   int div;
-  int i = 0;
+  int i;
   // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
   page = mmap(NULL,SUPER_BLOCK_SIZE,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE,-1,0);
-  
+
   sb = (struct superblock*) page;
   // Put this one the list.
   sb->bkeep.next = levels[power].next;
@@ -127,23 +127,24 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate (code) and fill (later loop as seen) the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-  div = 2;
-  for (; i < (power+4); i++) {
-    div = div*2;
+  divisor = 2;
+  for (i = 0; i < (power+4); i++) {
+    divisor = divisor * 2;
   }
-  // printf("%d\n", divisor);  //test if part of the math div outputs correctly
-  free_objects = SUPER_BLOCK_SIZE/(div)-1;
-
+  // printf("%d\n", divisor);
+  free_objects = SUPER_BLOCK_SIZE/(divisor)-1;
   if (!levels[power].free_objects){
     levels[power].free_objects = free_objects;
-  } else {
-    levels[power].free_objects += free_objects;
   }
-  bytes_per_object = div;
+  else{
+    levels[power].free_objects = levels[power].free_objects + free_objects;
+  }
+  bytes_per_object = divisor;
   sb->bkeep.free_count=free_objects;
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
+
   cursor = (char *) sb;
   // skip the first object
   for (cursor += bytes_per_object; free_objects--; cursor += bytes_per_object) {
@@ -167,9 +168,6 @@ void *malloc(size_t size) {
     errno = -ENOMEM;
     return NULL;
   }
-  
-  // Delete the following two lines
-  //errno = -ENOMEM;    //return rv;
   
   pool = &levels[power];
 
@@ -226,7 +224,7 @@ void free(void *ptr) {
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
   int i;
-  int div = 2;
+  int divisor = 2;
   int u = 0;
   struct superblock_bookkeeping *wBlock;
   struct object *frpnt = (struct object*) ptr;
@@ -239,9 +237,9 @@ void free(void *ptr) {
   levels[bkeep->level].free_objects++;
 
   for (i = 0; i < (bkeep->level+4); i++) {
-    div = div * 2;
+    divisor = divisor * 2;
   }
-  int test = (SUPER_BLOCK_SIZE/div)-1;
+  int test = (SUPER_BLOCK_SIZE/divisor)-1;
   if (bkeep->free_count==test) {
     levels[bkeep->level].whole_superblocks++;
   }
@@ -249,8 +247,8 @@ void free(void *ptr) {
   /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
    * Hint: use FREE_POISON
    */
-   int lev = bkeep->level;
-   memset(ptr, FREE_POISON, (size_t)((1<<(lev+5))));
+  int lev = bkeep->level;
+  memset(ptr, FREE_POISON, (size_t)((1<<(lev+5))));
 
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
@@ -258,17 +256,14 @@ void free(void *ptr) {
     // Return that superblock to the OS, using mmunmap
     //// basically freeing an object 1) so freeing the wholes one can have: superbloacks LL
     ///example: going down blocks, so delete empty superblocks each bkeep->next
-    /// if delete a middle, reset pointer 
+    ///  so if one deletes a middle block, reset pointer to *next 
       wBlock = bkeep;
       bkeep = wBlock->next;
       u = munmap(wBlock, SUPER_BLOCK_SIZE);
       if(u == 0){
         levels[bkeep->level].whole_superblocks--;
       }
-
-    //break; // hack to keep this loop from hanging; remove in ex 4
   }
-  
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
